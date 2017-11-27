@@ -154,7 +154,7 @@ public class BatchConfig {
         //Set gmail email id
         mailSender.setUsername("rangareddy35@gmail.com");
         //Set gmail email password
-        mailSender.setPassword("R@ng@@123");
+        mailSender.setPassword("XXXX");
         Properties prop = mailSender.getJavaMailProperties();
         prop.put("mail.transport.protocol", "smtp");
         prop.put("mail.smtp.auth", "true");
@@ -170,7 +170,7 @@ public class BatchConfig {
         Session session = Session.getInstance(prop,
                 new javax.mail.Authenticator() {
                     protected PasswordAuthentication getPasswordAuthentication() {
-                        return new PasswordAuthentication("rangareddy35@gmail.com", "R@ng@@123");
+                        return new PasswordAuthentication("rangareddy35@gmail.com", "XXXX");
                     }
                 });
         mailSender.setSession(session);
