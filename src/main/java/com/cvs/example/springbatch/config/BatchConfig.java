@@ -2,6 +2,8 @@ package com.cvs.example.springbatch.config;
 
 import com.cvs.example.springbatch.mapper.ExamResultRowMapper;
 import com.cvs.example.springbatch.model.ExamResult;
+import com.cvs.example.springbatch.service.SendMailService;
+import com.cvs.example.springbatch.service.SendMailTasklet;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
@@ -17,10 +19,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.web.client.RestTemplate;
 
+import javax.mail.PasswordAuthentication;
+import javax.mail.Session;
 import javax.sql.DataSource;
+import java.util.Properties;
 
 @Configuration
 public class BatchConfig {
@@ -52,6 +59,7 @@ public class BatchConfig {
         reader.setRowMapper(resultRowMapper());
         return reader;
     }
+
     @Bean
     public BeanWrapperFieldExtractor<ExamResult> fieldExtractor() {
         BeanWrapperFieldExtractor<ExamResult> fieldExtractor = new BeanWrapperFieldExtractor<>();
@@ -68,13 +76,14 @@ public class BatchConfig {
     }
 
     @Bean
-  //  @Scope("step1")
+    //  @Scope("step1")
     public FlatFileItemWriter<ExamResult> flatFileItemWriter() {
         FlatFileItemWriter<ExamResult> flatFileItemWriter = new FlatFileItemWriter<ExamResult>();
         flatFileItemWriter.setResource(new FileSystemResource("/csv/examResult.csv"));
         flatFileItemWriter.setLineAggregator(delimitedLineAggregator());
         return flatFileItemWriter;
     }
+
     @Bean
     public ItemWriter<ExamResult> writer() {
         FlatFileItemWriter<ExamResult> writer = new FlatFileItemWriter<ExamResult>();
@@ -82,7 +91,7 @@ public class BatchConfig {
         DelimitedLineAggregator<ExamResult> delLineAgg = new DelimitedLineAggregator<>();
         delLineAgg.setDelimiter(",");
         BeanWrapperFieldExtractor<ExamResult> fieldExtractor = new BeanWrapperFieldExtractor<ExamResult>();
-        fieldExtractor.setNames(new String[] {"studentName", "percentage", "dob"});
+        fieldExtractor.setNames(new String[]{"studentName", "percentage", "dob"});
         delLineAgg.setFieldExtractor(fieldExtractor);
         writer.setLineAggregator(delLineAgg);
         return writer;
@@ -99,10 +108,34 @@ public class BatchConfig {
     }
 
     @Bean
+    SendMailService sendMailService() {
+        return new SendMailService();
+    }
+
+    @Bean
+    SendMailTasklet sendMailTasklet() {
+        SendMailTasklet sendMailTasklet = new SendMailTasklet();
+        sendMailTasklet.setMailSender(mailSender());
+        sendMailTasklet.setSendMailService(sendMailService());
+        sendMailTasklet.setAttachmentFilePath(new FileSystemResource("D:\\csv\\examResult.csv").getFile().getAbsolutePath());
+        sendMailTasklet.setRecipient("rangareddyjava9@gmail.com");
+        sendMailTasklet.setSenderAddress("rangareddy35@gmail.com");
+        return sendMailTasklet;
+    }
+
+    @Bean
+    public Step sendMailStep() {
+        return stepBuilderFactory.get("sendMailStep")
+                .tasklet(sendMailTasklet())
+                .build();
+    }
+
+    @Bean
     public Job job() {
         return jobBuilderFactory.get("examResultJob")
                 .incrementer(new RunIdIncrementer())
                 .flow(step1())
+                .next(sendMailStep())
                 .end().build();
 
 
@@ -111,6 +144,37 @@ public class BatchConfig {
     @Bean
     public PlatformTransactionManager transactionManager() {
         return new org.springframework.batch.support.transaction.ResourcelessTransactionManager();
+    }
+
+    @Bean
+    public JavaMailSenderImpl mailSender() {
+        JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
+        mailSender.setHost("smtp.gmail.com");
+        mailSender.setPort(587);
+        //Set gmail email id
+        mailSender.setUsername("rangareddy35@gmail.com");
+        //Set gmail email password
+        mailSender.setPassword("R@ng@@123");
+        Properties prop = mailSender.getJavaMailProperties();
+        prop.put("mail.transport.protocol", "smtp");
+        prop.put("mail.smtp.auth", "true");
+        prop.put("mail.smtp.starttls.enable", "true");
+        prop.put("mail.debug", "true");
+        prop.put("mail.smtp.timeout","600000");
+        prop.put("mail.smtp.host", "smtp.gmail.com");
+        prop.put("mail.smtp.connectiontimeout","600000");
+        prop.put("mail.smtp.socketFactory.port", "465");
+        prop.put("mail.smtp.port", "465");
+        prop.put("mail.smtp.socketFactory.class",
+                "javax.net.ssl.SSLSocketFactory");
+        Session session = Session.getInstance(prop,
+                new javax.mail.Authenticator() {
+                    protected PasswordAuthentication getPasswordAuthentication() {
+                        return new PasswordAuthentication("rangareddy35@gmail.com", "R@ng@@123");
+                    }
+                });
+        mailSender.setSession(session);
+        return mailSender;
     }
 
 }
