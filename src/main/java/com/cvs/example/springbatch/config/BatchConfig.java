@@ -4,6 +4,7 @@ import com.cvs.example.springbatch.mapper.ExamResultRowMapper;
 import com.cvs.example.springbatch.model.ExamResult;
 import com.cvs.example.springbatch.service.SendMailService;
 import com.cvs.example.springbatch.service.SendMailTasklet;
+import com.cvs.example.springbatch.service.StudentDataExcelWriter;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
 import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
@@ -11,17 +12,13 @@ import org.springframework.batch.core.configuration.annotation.StepBuilderFactor
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
-import org.springframework.batch.item.file.FlatFileHeaderCallback;
 import org.springframework.batch.item.file.FlatFileItemWriter;
 import org.springframework.batch.item.file.transform.BeanWrapperFieldExtractor;
 import org.springframework.batch.item.file.transform.DelimitedLineAggregator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.web.client.RestTemplate;
@@ -29,8 +26,6 @@ import org.springframework.web.client.RestTemplate;
 import javax.mail.PasswordAuthentication;
 import javax.mail.Session;
 import javax.sql.DataSource;
-import java.io.IOException;
-import java.io.Writer;
 import java.util.Properties;
 
 @Configuration
@@ -43,6 +38,8 @@ public class BatchConfig {
     public StepBuilderFactory stepBuilderFactory;
     @Autowired
     private DataSource dataSource;
+    @Autowired
+    StudentDataExcelWriter studentDataExcelWriter;
 
 
     @Bean
@@ -62,30 +59,6 @@ public class BatchConfig {
         reader.setSql("SELECT STUDENT_NAME, DOB, PERCENTAGE FROM public.\"EXAM_RESULT\"");
         reader.setRowMapper(resultRowMapper());
         return reader;
-    }
-
-    @Bean
-    public BeanWrapperFieldExtractor<ExamResult> fieldExtractor() {
-        BeanWrapperFieldExtractor<ExamResult> fieldExtractor = new BeanWrapperFieldExtractor<>();
-        fieldExtractor.setNames(new String[]{"studentName", "percentage", "dob"});
-        return fieldExtractor;
-    }
-
-    @Bean
-    public DelimitedLineAggregator<ExamResult> delimitedLineAggregator() {
-        DelimitedLineAggregator<ExamResult> delimitedLineAggregator = new DelimitedLineAggregator<>();
-        delimitedLineAggregator.setDelimiter("|");
-        delimitedLineAggregator.setFieldExtractor(fieldExtractor());
-        return delimitedLineAggregator;
-    }
-
-    @Bean
-    //  @Scope("step1")
-    public FlatFileItemWriter<ExamResult> flatFileItemWriter() {
-        FlatFileItemWriter<ExamResult> flatFileItemWriter = new FlatFileItemWriter<ExamResult>();
-        flatFileItemWriter.setResource(new FileSystemResource("/csv/examResult.csv"));
-        flatFileItemWriter.setLineAggregator(delimitedLineAggregator());
-        return flatFileItemWriter;
     }
 
     @Bean
@@ -117,7 +90,7 @@ public class BatchConfig {
                 .transactionManager(transactionManager())
                 .<String, String>chunk(1)
                 .reader(databaseItemReader())
-                .writer(writer())
+                .writer(studentDataExcelWriter)//instead of csv file(writer()) we are using excel file(studentDataExcelWriter)
                 .build();
     }
 
@@ -131,7 +104,7 @@ public class BatchConfig {
         SendMailTasklet sendMailTasklet = new SendMailTasklet();
         sendMailTasklet.setMailSender(mailSender());
         sendMailTasklet.setSendMailService(sendMailService());
-        sendMailTasklet.setAttachmentFilePath(new FileSystemResource("\\csv\\examResult.csv").getFile().getAbsolutePath());
+        sendMailTasklet.setAttachmentFilePath(new FileSystemResource("csv\\examResult.xlsx").getFile().getAbsolutePath());
         sendMailTasklet.setRecipient("rangareddyjava9@gmail.com");
         sendMailTasklet.setSenderAddress("rangareddy35@gmail.com");
         return sendMailTasklet;
